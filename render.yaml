@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: product-birthdate
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: SAZU_API_KEY
+        sync: false

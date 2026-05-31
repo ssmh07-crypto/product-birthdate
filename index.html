@@ -14,8 +14,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;back
 .hero p,.desc{font-size:14px;line-height:1.8;color:#555}
 .section-title{font-size:19px;font-weight:800;margin-bottom:16px}
 label{display:block;margin-top:14px;margin-bottom:8px;font-size:14px;font-weight:700}
-input{width:100%;padding:15px;border-radius:16px;border:1px solid #ddd;background:#fafafa;font-size:15px}
+input,select{width:100%;padding:15px;border-radius:16px;border:1px solid #ddd;background:#fafafa;font-size:15px}
 button{width:100%;margin-top:22px;padding:18px;border:0;border-radius:18px;background:#8b6f47;color:#fff;font-size:17px;font-weight:800}
+button:disabled{opacity:.6}
 .result{display:none}
 .rank-card{border:1px solid #eadfce;background:#fffdf8;border-radius:24px;padding:18px;margin-top:18px}
 .rank{display:inline-block;background:#8b6f47;color:#fff;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:800;margin-bottom:12px}
@@ -68,11 +69,20 @@ button{width:100%;margin-top:22px;padding:18px;border:0;border-radius:18px;backg
     <label>병원 출산예정일</label>
     <input type="date" id="dueDate">
 
+    <label>아이 성별</label>
+    <select id="babyGender">
+      <option value="male">남아</option>
+      <option value="female">여아</option>
+    </select>
+
+    <label>출산 지역</label>
+    <input type="text" id="birthCity" value="서울" placeholder="예: 서울">
+
     <button onclick="showResult()">출산 날짜 추천받기</button>
   </div>
 
   <div class="card result" id="resultBox">
-    <div class="section-title">추천 출산 날짜 TOP 3</div>
+    <div class="section-title">추천 출산 날짜</div>
     <div class="range-box" id="rangeBox"></div>
     <div id="resultList"></div>
 
@@ -269,31 +279,44 @@ function getNamesByWeakElements(weak){
   return [...new Set(pool)].slice(0,10);
 }
 
-function showResult(){
+async function showResult(){
+  const button = document.querySelector("button");
+  const motherDate = document.getElementById("motherDate").value;
+  const motherTime = document.getElementById("motherTime").value;
+  const fatherDate = document.getElementById("fatherDate").value;
+  const fatherTime = document.getElementById("fatherTime").value;
   const dueInput = document.getElementById("dueDate").value;
-  if(!dueInput){
-    alert("출산예정일을 입력해주세요.");
+  const babyGender = document.getElementById("babyGender").value;
+  const birthCity = document.getElementById("birthCity").value.trim();
+
+  if(!motherDate || !motherTime || !fatherDate || !fatherTime || !dueInput || !birthCity){
+    alert("모든 입력 항목을 입력해주세요.");
     return;
   }
 
-  const dueDate = new Date(dueInput);
-  const startDate = addDays(dueDate,-28);
+  button.disabled = true;
+  button.textContent = "만세력 분석 중...";
 
-  document.getElementById("rangeBox").innerHTML =
-    `분석 범위는 <strong>${formatDate(startDate)}</strong>부터 <strong>${formatDate(dueDate)}</strong>까지입니다.`;
+  try {
+    const response = await fetch("/api/birth-recommendations", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({motherDate,motherTime,fatherDate,fatherTime,dueDate:dueInput,babyGender,birthCity})
+    });
+    const result = await response.json();
+    if(!response.ok) throw new Error(result.error || "추천 결과를 불러오지 못했습니다.");
 
-  const candidates = [
-    {rank:"1순위", date:addDays(dueDate,-14), hour:17, timeText:"오후 5시 ~ 7시"},
-    {rank:"2순위", date:addDays(dueDate,-18), hour:9, timeText:"오전 9시 ~ 11시"},
-    {rank:"3순위", date:addDays(dueDate,-8), hour:13, timeText:"오후 1시 ~ 3시"}
-  ];
+    document.getElementById("rangeBox").innerHTML =
+      `분석 범위는 <strong>${formatDate(new Date(`${result.data.range.startDate}T00:00:00`))}</strong>부터 <strong>${formatDate(new Date(`${result.data.range.endDate}T00:00:00`))}</strong>까지입니다.`;
+
+    const candidates = result.data.candidates.map(item=>({...item,date:new Date(`${item.date}T00:00:00`)}));
 
   let html = "";
 
   candidates.forEach(item=>{
-    const saju = makeSaju(item.date,item.hour);
-    const count = countElements(saju);
-    const balance = scoreBalance(count);
+    const saju = item.saju;
+    const count = item.count;
+    const balance = item.balance;
     const weak = getWeakElements(count);
     const names = getNamesByWeakElements(weak);
 
@@ -320,19 +343,19 @@ function showResult(){
         </div>
 
         <div class="score-item">
-          <div class="score-top"><span>엄마와의 조화</span><strong>${Math.min(95,balance-1)}점</strong></div>
+          <div class="score-top"><span>엄마와의 조화</span><strong>${item.motherHarmony}점</strong></div>
           <div class="score-bar"><div class="score-fill" style="width:${Math.min(95,balance-1)}%"></div></div>
           <p>아이 사주의 정서적 안정성과 양육 과정에서의 교감 흐름을 중심으로 본 점수입니다.</p>
         </div>
 
         <div class="score-item">
-          <div class="score-top"><span>아빠와의 조화</span><strong>${Math.min(94,balance-3)}점</strong></div>
+          <div class="score-top"><span>아빠와의 조화</span><strong>${item.fatherHarmony}점</strong></div>
           <div class="score-bar"><div class="score-fill" style="width:${Math.min(94,balance-3)}%"></div></div>
           <p>아이의 생활력, 기준 형성, 책임감 흐름을 중심으로 본 점수입니다.</p>
         </div>
 
         <div class="score-item">
-          <div class="score-top"><span>사회성</span><strong>${count.fire + count.wood >= 3 ? 91 : 84}점</strong></div>
+          <div class="score-top"><span>사회성</span><strong>${item.sociality}점</strong></div>
           <div class="score-bar"><div class="score-fill" style="width:${count.fire + count.wood >= 3 ? 91 : 84}%"></div></div>
           <p>화(火)의 표현력과 목(木)의 성장성이 함께 있으면 대인관계와 표현력이 강점으로 나타납니다.</p>
         </div>
@@ -363,9 +386,15 @@ function showResult(){
     `;
   });
 
-  document.getElementById("resultList").innerHTML = html;
-  document.getElementById("resultBox").style.display = "block";
-  document.getElementById("resultBox").scrollIntoView({behavior:"smooth"});
+    document.getElementById("resultList").innerHTML = html;
+    document.getElementById("resultBox").style.display = "block";
+    document.getElementById("resultBox").scrollIntoView({behavior:"smooth"});
+  } catch(error) {
+    alert(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "출산 날짜 추천받기";
+  }
 }
 </script>
 
