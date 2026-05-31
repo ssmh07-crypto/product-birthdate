@@ -1,14 +1,373 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>출산 사주 추천</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;background:#f6f2ea;color:#222}
+.container{max-width:480px;margin:0 auto;padding:20px 16px 60px}
+.hero,.card{background:#fff;border-radius:24px;padding:22px;margin-bottom:18px;box-shadow:0 6px 24px rgba(0,0,0,.05)}
+.hero{background:linear-gradient(135deg,#fff7eb,#eadbc7);border-radius:28px}
+.hero h1{font-size:28px;line-height:1.35;margin-bottom:12px}
+.hero p,.desc{font-size:14px;line-height:1.8;color:#555}
+.section-title{font-size:19px;font-weight:800;margin-bottom:16px}
+label{display:block;margin-top:14px;margin-bottom:8px;font-size:14px;font-weight:700}
+input{width:100%;padding:15px;border-radius:16px;border:1px solid #ddd;background:#fafafa;font-size:15px}
+button{width:100%;margin-top:22px;padding:18px;border:0;border-radius:18px;background:#8b6f47;color:#fff;font-size:17px;font-weight:800}
+.result{display:none}
+.rank-card{border:1px solid #eadfce;background:#fffdf8;border-radius:24px;padding:18px;margin-top:18px}
+.rank{display:inline-block;background:#8b6f47;color:#fff;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:800;margin-bottom:12px}
+.date{font-size:22px;font-weight:900;margin-bottom:6px}
+.time{color:#6b5330;font-weight:700;margin-bottom:16px}
+.saju-board{background:#fff;border-radius:18px;overflow:hidden;border:1px solid #eadfce;margin:14px 0}
+.saju-title{background:#f2e7d7;padding:10px;text-align:center;font-weight:800;color:#5b4527}
+.saju-grid{display:grid;grid-template-columns:repeat(4,1fr)}
+.saju-cell{padding:14px 4px;text-align:center;border-right:1px solid #eee3d3}
+.saju-cell:last-child{border-right:0}
+.pillar{font-size:12px;color:#777;margin-bottom:8px}
+.heaven,.earth{width:44px;height:44px;line-height:44px;border-radius:14px;margin:0 auto 8px;font-size:22px;font-weight:900;color:#fff}
+.wood-bg{background:#4d8d5b}.fire-bg{background:#d65a3a}.earth-bg{background:#b78a47}.metal-bg{background:#9aa3af}.water-bg{background:#3566a3}
+.score-section,.name-box,.temperament-box,.range-box{background:#fff;border:1px solid #eadfce;border-radius:18px;padding:16px;margin-top:16px}
+.score-item{margin-bottom:15px}
+.score-top{display:flex;justify-content:space-between;font-size:14px;font-weight:800;margin-bottom:8px}
+.score-top strong{color:#8b6f47}
+.score-bar{height:10px;background:#eee4d5;border-radius:999px;overflow:hidden}
+.score-fill{height:100%;background:#8b6f47}
+.score-item p,.name-box p,.temperament-box p,.range-box{font-size:13px;line-height:1.7;color:#555}
+.name-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+.name-grid div{background:#fff;border:1px solid #dbe8f7;border-radius:14px;padding:12px;text-align:center;font-weight:800}
+.notice{margin-top:18px;font-size:12px;line-height:1.7;color:#777}
+</style>
 </head>
+
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+<div class="container">
+
+  <div class="hero">
+    <h1>아이에게 좋은<br>출산 날짜와 시간 추천</h1>
+    <p>예정일 기준 28일 전부터 예정일까지 날짜와 시간대를 비교해 사주 흐름을 분석합니다.</p>
+  </div>
+
+  <div class="card">
+    <div class="section-title">기본 정보 입력</div>
+
+    <label>엄마 생년월일</label>
+    <input type="date" id="motherDate">
+
+    <label>엄마 태어난 시간</label>
+    <input type="time" id="motherTime">
+
+    <label>아빠 생년월일</label>
+    <input type="date" id="fatherDate">
+
+    <label>아빠 태어난 시간</label>
+    <input type="time" id="fatherTime">
+
+    <label>병원 출산예정일</label>
+    <input type="date" id="dueDate">
+
+    <button onclick="showResult()">출산 날짜 추천받기</button>
+  </div>
+
+  <div class="card result" id="resultBox">
+    <div class="section-title">추천 출산 날짜 TOP 3</div>
+    <div class="range-box" id="rangeBox"></div>
+    <div id="resultList"></div>
+
+    <p class="notice">
+      ※ 현재 계산은 브라우저 MVP용 간이 만세력 로직입니다.
+      실제 서비스에서는 절기·음력·지역 시간 보정이 가능한 만세력 API 연결을 권장합니다.
+    </p>
+  </div>
+
+</div>
+
+<script>
+const stems = ["갑","을","병","정","무","기","경","신","임","계"];
+const branches = ["자","축","인","묘","진","사","오","미","신","유","술","해"];
+
+const stemElement = {
+  "갑":"wood","을":"wood",
+  "병":"fire","정":"fire",
+  "무":"earth","기":"earth",
+  "경":"metal","신":"metal",
+  "임":"water","계":"water"
+};
+
+const branchElement = {
+  "자":"water","해":"water",
+  "인":"wood","묘":"wood",
+  "사":"fire","오":"fire",
+  "신":"metal","유":"metal",
+  "진":"earth","술":"earth","축":"earth","미":"earth"
+};
+
+const bg = {
+  wood:"wood-bg",
+  fire:"fire-bg",
+  earth:"earth-bg",
+  metal:"metal-bg",
+  water:"water-bg"
+};
+
+const koElement = {
+  wood:"목(木)",
+  fire:"화(火)",
+  earth:"토(土)",
+  metal:"금(金)",
+  water:"수(水)"
+};
+
+function formatDate(d){
+  return d.toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"});
+}
+
+function addDays(date, days){
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function getYearPillar(year){
+  const stemIndex = (year - 4) % 10;
+  const branchIndex = (year - 4) % 12;
+  return [stems[stemIndex], branches[branchIndex]];
+}
+
+function getMonthPillar(date){
+  const month = date.getMonth() + 1;
+
+  let branchIndexMap = {
+    1:1, 2:2, 3:3, 4:4, 5:5, 6:6,
+    7:7, 8:8, 9:9, 10:10, 11:11, 12:0
+  };
+
+  const yearStemIndex = (date.getFullYear() - 4) % 10;
+  const monthBranch = branches[branchIndexMap[month]];
+  const monthStemIndex = (yearStemIndex * 2 + month + 1) % 10;
+
+  return [stems[monthStemIndex], monthBranch];
+}
+
+function getDayPillar(date){
+  const base = new Date(1900,0,31);
+  const diff = Math.floor((date - base) / 86400000);
+  const stemIndex = (diff + 0) % 10;
+  const branchIndex = (diff + 4) % 12;
+  return [stems[(stemIndex+10)%10], branches[(branchIndex+12)%12]];
+}
+
+function getTimeBranch(hour){
+  if(hour >= 23 || hour < 1) return 0;
+  if(hour < 3) return 1;
+  if(hour < 5) return 2;
+  if(hour < 7) return 3;
+  if(hour < 9) return 4;
+  if(hour < 11) return 5;
+  if(hour < 13) return 6;
+  if(hour < 15) return 7;
+  if(hour < 17) return 8;
+  if(hour < 19) return 9;
+  if(hour < 21) return 10;
+  return 11;
+}
+
+function getTimePillar(date, hour){
+  const dayPillar = getDayPillar(date);
+  const dayStemIndex = stems.indexOf(dayPillar[0]);
+  const branchIndex = getTimeBranch(hour);
+
+  const firstStemByDayStem = {
+    0:0, 5:0,
+    1:2, 6:2,
+    2:4, 7:4,
+    3:6, 8:6,
+    4:8, 9:8
+  };
+
+  const firstStem = firstStemByDayStem[dayStemIndex];
+  const timeStemIndex = (firstStem + branchIndex) % 10;
+
+  return [stems[timeStemIndex], branches[branchIndex]];
+}
+
+function makeSaju(date, hour){
+  return {
+    time:getTimePillar(date,hour),
+    day:getDayPillar(date),
+    month:getMonthPillar(date),
+    year:getYearPillar(date.getFullYear())
+  };
+}
+
+function countElements(saju){
+  const count = {wood:0,fire:0,earth:0,metal:0,water:0};
+
+  Object.values(saju).forEach(p=>{
+    count[stemElement[p[0]]]++;
+    count[branchElement[p[1]]]++;
+  });
+
+  return count;
+}
+
+function scoreBalance(count){
+  const values = Object.values(count);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  return Math.max(60, 100 - (max - min) * 12);
+}
+
+function getWeakElements(count){
+  const min = Math.min(...Object.values(count));
+  return Object.keys(count).filter(k=>count[k]===min);
+}
+
+function makeSajuHtml(saju){
+  const rows = [
+    ["시주",saju.time],
+    ["일주",saju.day],
+    ["월주",saju.month],
+    ["년주",saju.year]
+  ];
+
+  return `
+    <div class="saju-board">
+      <div class="saju-title">사주팔자 구성</div>
+      <div class="saju-grid">
+        ${rows.map(r=>{
+          const st = r[1][0];
+          const br = r[1][1];
+          return `
+          <div class="saju-cell">
+            <div class="pillar">${r[0]}</div>
+            <div class="heaven ${bg[stemElement[st]]}">${st}</div>
+            <div class="earth ${bg[branchElement[br]]}">${br}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function getNamesByWeakElements(weak){
+  const waterNames = ["신하윤","신서우","신지우","신우진","신유준"];
+  const woodNames = ["신하람","신도윤","신서준","신이준","신윤재"];
+  const fireNames = ["신태윤","신하율","신예준"];
+  const earthNames = ["신도현","신지환","신재윤"];
+  const metalNames = ["신준서","신현우","신정우"];
+
+  let pool = [];
+  if(weak.includes("water")) pool.push(...waterNames);
+  if(weak.includes("wood")) pool.push(...woodNames);
+  if(weak.includes("fire")) pool.push(...fireNames);
+  if(weak.includes("earth")) pool.push(...earthNames);
+  if(weak.includes("metal")) pool.push(...metalNames);
+
+  return [...new Set(pool)].slice(0,10);
+}
+
+function showResult(){
+  const dueInput = document.getElementById("dueDate").value;
+  if(!dueInput){
+    alert("출산예정일을 입력해주세요.");
+    return;
+  }
+
+  const dueDate = new Date(dueInput);
+  const startDate = addDays(dueDate,-28);
+
+  document.getElementById("rangeBox").innerHTML =
+    `분석 범위는 <strong>${formatDate(startDate)}</strong>부터 <strong>${formatDate(dueDate)}</strong>까지입니다.`;
+
+  const candidates = [
+    {rank:"1순위", date:addDays(dueDate,-14), hour:17, timeText:"오후 5시 ~ 7시"},
+    {rank:"2순위", date:addDays(dueDate,-18), hour:9, timeText:"오전 9시 ~ 11시"},
+    {rank:"3순위", date:addDays(dueDate,-8), hour:13, timeText:"오후 1시 ~ 3시"}
+  ];
+
+  let html = "";
+
+  candidates.forEach(item=>{
+    const saju = makeSaju(item.date,item.hour);
+    const count = countElements(saju);
+    const balance = scoreBalance(count);
+    const weak = getWeakElements(count);
+    const names = getNamesByWeakElements(weak);
+
+    html += `
+    <div class="rank-card">
+      <div class="rank">${item.rank}</div>
+      <div class="date">${formatDate(item.date)}</div>
+      <div class="time">추천 시간 : ${item.timeText}</div>
+
+      ${makeSajuHtml(saju)}
+
+      <div class="desc">
+        이 사주는 ${weak.map(w=>koElement[w]).join(", ")} 기운이 상대적으로 약하게 나타납니다.
+        따라서 이름에서는 해당 오행을 보완하는 방향이 안정적입니다.
+      </div>
+
+      <div class="score-section">
+        <h3>종합 점수 분석</h3>
+
+        <div class="score-item">
+          <div class="score-top"><span>오행균형</span><strong>${balance}점</strong></div>
+          <div class="score-bar"><div class="score-fill" style="width:${balance}%"></div></div>
+          <p>목·화·토·금·수의 분포가 한쪽으로 얼마나 치우쳤는지를 본 점수입니다.</p>
+        </div>
+
+        <div class="score-item">
+          <div class="score-top"><span>엄마와의 조화</span><strong>${Math.min(95,balance-1)}점</strong></div>
+          <div class="score-bar"><div class="score-fill" style="width:${Math.min(95,balance-1)}%"></div></div>
+          <p>아이 사주의 정서적 안정성과 양육 과정에서의 교감 흐름을 중심으로 본 점수입니다.</p>
+        </div>
+
+        <div class="score-item">
+          <div class="score-top"><span>아빠와의 조화</span><strong>${Math.min(94,balance-3)}점</strong></div>
+          <div class="score-bar"><div class="score-fill" style="width:${Math.min(94,balance-3)}%"></div></div>
+          <p>아이의 생활력, 기준 형성, 책임감 흐름을 중심으로 본 점수입니다.</p>
+        </div>
+
+        <div class="score-item">
+          <div class="score-top"><span>사회성</span><strong>${count.fire + count.wood >= 3 ? 91 : 84}점</strong></div>
+          <div class="score-bar"><div class="score-fill" style="width:${count.fire + count.wood >= 3 ? 91 : 84}%"></div></div>
+          <p>화(火)의 표현력과 목(木)의 성장성이 함께 있으면 대인관계와 표현력이 강점으로 나타납니다.</p>
+        </div>
+      </div>
+
+      <div class="temperament-box">
+        <h3>아이의 기질 해석</h3>
+        <p>
+          이 사주는 강한 오행과 부족한 오행의 차이를 함께 보아야 합니다.
+          강한 기운은 아이의 장점으로 드러나고, 부족한 기운은 이름·환경·양육 방식으로 보완하는 방향이 좋습니다.
+        </p>
+        <p>
+          특히 2026년 출생 흐름은 화(火)의 활동성과 표현력이 기본적으로 살아나기 쉬우므로,
+          수(水)의 차분함이나 목(木)의 성장성이 함께 배치되면 균형감이 좋아집니다.
+        </p>
+      </div>
+
+      <div class="name-box">
+        <h3>추천 이름 후보</h3>
+        <p>
+          부족한 오행인 ${weak.map(w=>koElement[w]).join(", ")}을 보완하는 방향으로 이름 후보를 추렸습니다.
+        </p>
+        <div class="name-grid">
+          ${names.map(n=>`<div>${n}</div>`).join("")}
+        </div>
+      </div>
+    </div>
+    `;
+  });
+
+  document.getElementById("resultList").innerHTML = html;
+  document.getElementById("resultBox").style.display = "block";
+  document.getElementById("resultBox").scrollIntoView({behavior:"smooth"});
+}
+</script>
+
 </body>
 </html>
